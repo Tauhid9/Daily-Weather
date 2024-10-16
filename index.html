@@ -11,7 +11,7 @@
         <header>
             <h1>Daily Weather</h1>
             <div class="search-bar">
-                <input type="text" id="locationInput" placeholder="Enter a city name">
+                <input type="text" id="locationInput" placeholder="Enter a city name...">
                 <button id="searchBtn">Search</button>
             </div>
         </header>
@@ -19,6 +19,25 @@
         <main>
             <div id="weatherData" class="weather-info"></div>
             <div id="forecastData" class="forecast-info"></div>
+            
+            <!-- Sorting and Filters Section -->
+            <div class="sorting-filters">
+                <label for="sortOptions">Sort Forecast:</label>
+                <select id="sortOptions">
+                    <option value="default">Select</option>
+                    <option value="lowToHigh">Low to High (MAX_Tem)</option>
+                    <option value="highToLow">High to Low (MAX_Tem)</option>
+                </select>
+
+                <label for="filterOptions">Filter by Condition:</label>
+                <select id="filterOptions">
+                    <option value="all">All</option>
+                    <option value="sunny">Sunny</option>
+                    <option value="cloudy">Cloudy</option>
+                    <option value="rainy">Rainy</option>
+                    <option value="snowy">Snowy</option>
+                </select>
+            </div>
         </main>
 
         <footer>
@@ -29,3 +48,4 @@
     <script src="api.js"></script>
 </body>
 </html>
+
