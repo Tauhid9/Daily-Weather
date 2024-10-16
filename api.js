@@ -1,111 +1,130 @@
-// API Key and Base URL for fetching weather data
-const apiKey = '6141dd6d84dd40ee961131826241510'; // Your API key from WeatherAPI
-const baseUrl = 'https://api.weatherapi.com/v1'; // Base URL for API requests
+const apiKey = '6141dd6d84dd40ee961131826241510';
+        const baseUrl = 'https://api.weatherapi.com/v1';
 
-// DOM Elements: Get references to the HTML elements used in the script
-const locationInput = document.getElementById('locationInput'); // Input field for location
-const searchBtn = document.getElementById('searchBtn'); // Button to trigger the search
-const weatherData = document.getElementById('weatherData'); // Div to display current weather
-const forecastData = document.getElementById('forecastData'); // Div to display weather forecast
-const sortOptions = document.getElementById('sortOptions'); // Dropdown for sorting options
-const filterOptions = document.getElementById('filterOptions'); // Dropdown for filter options
+        const locationInput = document.getElementById('locationInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const weatherData = document.getElementById('weatherData');
+        const forecastData = document.getElementById('forecastData');
+        const sortOptions = document.getElementById('sortOptions');
+        const filterOptions = document.getElementById('filterOptions');
 
-// Event listener for the search button
-searchBtn.addEventListener('click', () => {
-    const location = locationInput.value.trim(); // Get value from input and trim whitespace
-    if (location) {
-        getWeatherData(location); // Call function to get weather data if location is provided
-    } else {
-        alert('Please enter a city name'); // Alert user if no location is entered
-    }
-});
+        let lastLocation = ''; // Cache the last searched location
+        let lastWeatherData = null; // Cache the last weather data
+        let lastForecastData = null; // Cache the last forecast data
+        const cacheDuration = 60 * 1000; // 1 minute cache duration
 
-// Async function to fetch weather data based on the location provided
-async function getWeatherData(location) {
-    try {
-        // Fetch current weather data from API
-        const weatherResponse = await fetch(`${baseUrl}/current.json?key=${apiKey}&q=${location}`);
-        // Fetch 4-day forecast data from API
-        const forecastResponse = await fetch(`${baseUrl}/forecast.json?key=${apiKey}&q=${location}&days=4`);
+        searchBtn.addEventListener('click', () => {
+            const location = locationInput.value.trim();
+            if (location) {
+                getWeatherData(location);
+            } else {
+                alert('Please enter a city name');
+            }
+        });
 
-        // Check if both responses are OK; if not, throw an error
-        if (!weatherResponse.ok || !forecastResponse.ok) throw new Error('City not found');
+        // Debounce function to limit API calls
+        function debounce(func, delay) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
 
-        // Parse JSON responses
-        const weatherDataJson = await weatherResponse.json();
-        const forecastDataJson = await forecastResponse.json();
+        // Optimized getWeatherData function
+        async function getWeatherData(location) {
+            if (location === lastLocation && lastWeatherData && Date.now() - lastWeatherData.timestamp < cacheDuration) {
+                // Use cached data if within cache duration
+                displayWeather(lastWeatherData.data);
+                displayForecast(lastForecastData.forecast.forecastday);
+                return;
+            }
 
-        // Display current weather and forecast data
-        displayWeather(weatherDataJson);
-        displayForecast(forecastDataJson.forecast.forecastday);
-        
-        // Add event listeners for sorting and filtering after data is fetched
-        sortOptions.addEventListener('change', () => sortForecast(forecastDataJson.forecast.forecastday));
-        filterOptions.addEventListener('change', () => filterForecast(forecastDataJson.forecast.forecastday));
-        
-    } catch (error) {
-        // Display error message if any error occurs
-        weatherData.innerHTML = `<p style="color: red;">${error.message}</p>`;
-        forecastData.innerHTML = ''; // Clear forecast data if there's an error
-    }
-}
+            try {
+                const weatherResponse = await fetch(`${baseUrl}/current.json?key=${apiKey}&q=${location}`);
+                const forecastResponse = await fetch(`${baseUrl}/forecast.json?key=${apiKey}&q=${location}&days=4`);
 
-// Function to display current weather data
-function displayWeather(data) {
-    const { location, current } = data; // Destructure the location and current weather data
-    weatherData.innerHTML = `
-        <h2>Weather in ${location.name}, ${location.country}</h2>
-        <p><strong>Temperature:</strong> ${current.temp_c}°C</p>
-        <p><strong>Condition:</strong> ${current.condition.text}</p>
-        <p><strong>Humidity:</strong> ${current.humidity}% | <strong>Wind:</strong> ${current.wind_kph} km/h</p>
-        <img src="https:${data.current.condition.icon}" alt="Weather icon"> <!-- Display weather icon -->
-    `;
-}
+                if (!weatherResponse.ok || !forecastResponse.ok) throw new Error('City not found');
 
-// Function to display the 4-day weather forecast
-function displayForecast(forecast) {
-    let forecastHtml = `<h2>4-Day Forecast</h2>`; // Initialize forecast HTML
+                const weatherDataJson = await weatherResponse.json();
+                const forecastDataJson = await forecastResponse.json();
 
-    forecast.forEach(day => { // Iterate over each forecast day
-        forecastHtml += `
-            <div class="forecast-day" data-condition="${day.day.condition.text.toLowerCase()}"> <!-- Add data attribute for filtering -->
-                <p>${day.date}</p>
-                <p>Max: ${day.day.maxtemp_c}°C | Min: ${day.day.mintemp_c}°C</p>
-                <p>Condition: ${day.day.condition.text}</p>
-                <img src="https:${day.day.condition.icon}" alt="Forecast icon"> <!-- Display forecast icon -->
-            </div>
-        `;
-    });
+                // Cache the data
+                lastLocation = location;
+                lastWeatherData = {
+                    timestamp: Date.now(),
+                    data: weatherDataJson
+                };
+                lastForecastData = forecastDataJson;
 
-    forecastData.innerHTML = forecastHtml; // Insert forecast HTML into the DOM
-}
+                displayWeather(weatherDataJson);
+                displayForecast(forecastDataJson.forecast.forecastday);
 
-// Function to sort the forecast data
-function sortForecast(forecast) {
-    const sortOption = sortOptions.value; // Get the selected sort option
+                sortOptions.addEventListener('change', () => sortForecast(forecastDataJson.forecast.forecastday));
+                filterOptions.addEventListener('change', () => filterForecast(forecastDataJson.forecast.forecastday));
 
-    // Sort forecast based on the selected option
-    if (sortOption === 'lowToHigh') {
-        forecast.sort((a, b) => a.day.maxtemp_c - b.day.maxtemp_c); // Sort from low to high max temperature
-    } else if (sortOption === 'highToLow') {
-        forecast.sort((a, b) => b.day.maxtemp_c - a.day.maxtemp_c); // Sort from high to low max temperature
-    }
-    
-    displayForecast(forecast); // Re-display the sorted forecast
-}
+            } catch (error) {
+                weatherData.innerHTML = `<p style="color: red;">${error.message}</p>`;
+                forecastData.innerHTML = '';
+            }
+        }
 
-// Function to filter the forecast data
-function filterForecast(forecast) {
-    const filterOption = filterOptions.value; // Get the selected filter option
+        function displayWeather(data) {
+            const { location, current } = data;
+            weatherData.innerHTML = `
+                <h2>Weather in ${location.name}, ${location.country}</h2>
+                <p><strong>Temperature:</strong> ${current.temp_c}°C</p>
+                <p><strong>Condition:</strong> ${current.condition.text}</p>
+                <p><strong>Humidity:</strong> ${current.humidity}% | <strong>Wind:</strong> ${current.wind_kph} km/h</p>
+                <img loading="lazy" src="https:${data.current.condition.icon}" alt="Weather icon"> <!-- Lazy load image -->
+            `;
+        }
 
-    // Filter forecast based on the selected condition
-    const filteredForecast = forecast.filter(day => {
-        const condition = day.day.condition.text.toLowerCase(); // Get condition in lowercase
+        function displayForecast(forecast) {
+            let forecastHtml = `<h2>4-Day Forecast</h2>`;
+            forecast.forEach(day => {
+                forecastHtml += `
+                    <div class="forecast-day" data-condition="${day.day.condition.text.toLowerCase()}">
+                        <p>${day.date}</p>
+                        <p>Max: ${day.day.maxtemp_c}°C | Min: ${day.day.mintemp_c}°C</p>
+                        <p>Condition: ${day.day.condition.text}</p>
+                        <img loading="lazy" src="https:${day.day.condition.icon}" alt="Forecast icon"> <!-- Lazy load image -->
+                    </div>
+                `;
+            });
+            forecastData.innerHTML = forecastHtml;
+        }
 
-        // Return true for 'all' or if condition matches the selected option
-        if (filterOption === 'all') return true;
-        return condition.includes(filterOption); // Check if condition includes the selected filter
-    });
+        function sortForecast(forecast) {
+            const sortOption = sortOptions.value;
 
-    displayForecast(filteredForecast); // Re-display the filtered forecast
-}
+            if (sortOption === 'lowToHigh') {
+                forecast.sort((a, b) => a.day.maxtemp_c - b.day.maxtemp_c);
+            } else if (sortOption === 'highToLow') {
+                forecast.sort((a, b) => b.day.maxtemp_c - a.day.maxtemp_c);
+            }
+
+            displayForecast(forecast);
+        }
+
+        function filterForecast(forecast) {
+            const filterOption = filterOptions.value;
+
+            const filteredForecast = forecast.filter(day => {
+                const condition = day.day.condition.text.toLowerCase();
+                if (filterOption === 'all') return true;
+                return condition.includes(filterOption.toLowerCase());
+            });
+
+            displayForecast(filteredForecast);
+        }
+
+        // Debounced input listener
+        const debouncedSearch = debounce(() => {
+            const location = locationInput.value.trim();
+            if (location) {
+                getWeatherData(location);
+            }
+        }, 300); // 300ms debounce time
+
+        locationInput.addEventListener('input', debouncedSearch); // Attach debounced listener to input
